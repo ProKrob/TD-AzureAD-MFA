@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "value": "MfaAdmin"
+    },
+    "adminPassword": {
+      "value": "Zaq12wsxcde3"
+    },
+    "domainName": {
+      "value": "mb.mfalab.rtriad.biz"
+    },
+    "dnsPrefix": {
+      "value": "mb3ad"
+    }
+  }
+}

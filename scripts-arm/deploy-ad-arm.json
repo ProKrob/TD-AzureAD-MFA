@@ -39,14 +39,14 @@
             "metadata": {
                 "description": "The location of resources, such as templates and DSC modules, that the template depends on"
             },
-            "defaultValue": "https://raw.githubusercontent.com/mobeamer/ad-mfa-test/master/scripts-powershell/"
+            "defaultValue": "https://raw.githubusercontent.com/ProKrob/TD-AzureAD-MFA/master/scripts-powershell/"
         },
         "armScriptsLocation": {
             "type": "string",
             "metadata": {
                 "description": "The location of resources, such as templates and DSC modules, that the template depends on"
             },
-            "defaultValue": "https://raw.githubusercontent.com/mobeamer/ad-mfa-test/master/scripts-arm/"
+            "defaultValue": "https://raw.githubusercontent.com/ProKrob/TD-AzureAD-MFA/master/scripts-arm/"
         },
         
         
@@ -56,7 +56,7 @@
             "metadata": {
                 "description": "The location of resources, such as templates and DSC modules, that the template depends on"
             },
-            "defaultValue": "https://raw.githubusercontent.com/mobeamer/ad-mfa-test/master/scripts-arm/"
+            "defaultValue": "https://raw.githubusercontent.com/ProKrob/TD-AzureAD-MFA/master/scripts-arm/"
         },
         "_artifactsLocationSasToken": {
             "type": "securestring",

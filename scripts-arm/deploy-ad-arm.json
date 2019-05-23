@@ -290,7 +290,7 @@
                         "typeHandlerVersion": "2.19",
                         "autoUpgradeMinorVersion": true,
                         "settings": {
-                            "ModulesUrl": "[uri(parameters('powershellScriptLocation'), concat('DSC/CreateADPDC.zip?raw=true', parameters('_artifactsLocationSasToken')))]",
+                            "ModulesUrl": "[uri(parameters('powershellScriptLocation'), concat('DSC/CreateADPDC.zip', parameters('_artifactsLocationSasToken')))]",
                             "ConfigurationFunction": "CreateADPDC.ps1\\CreateADPDC",
                             "Properties": {
                                 "DomainName": "[parameters('domainName')]",

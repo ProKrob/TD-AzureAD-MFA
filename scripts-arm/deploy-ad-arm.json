@@ -39,7 +39,7 @@
             "metadata": {
                 "description": "The location of resources, such as templates and DSC modules, that the template depends on"
             },
-            "defaultValue": "https://github.com/ProKrob/TD-AzureAD-MFA/tree/master/scripts-powershell/"
+            "defaultValue": "https://krobrgdisks.file.core.windows.net/dsc/"
         },
         "armScriptsLocation": {
             "type": "string",
@@ -59,6 +59,13 @@
             "defaultValue": "https://raw.githubusercontent.com/ProKrob/TD-AzureAD-MFA/master/scripts-arm/"
         },
         "_artifactsLocationSasToken": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Auto-generated token to access _artifactsLocation"
+            },
+            "defaultValue": ""
+        },
+        "_PSartifactsLocationSasToken": {
             "type": "securestring",
             "metadata": {
                 "description": "Auto-generated token to access _artifactsLocation"
@@ -290,7 +297,7 @@
                         "typeHandlerVersion": "2.19",
                         "autoUpgradeMinorVersion": true,
                         "settings": {
-                            "ModulesUrl": "[uri(parameters('powershellScriptLocation'), concat('DSC/CreateADPDC.zip', parameters('_artifactsLocationSasToken')))]",
+                            "ModulesUrl": "[uri(parameters('powershellScriptLocation'), concat('CreateADPDC.zip', parameters('_PSartifactsLocationSasToken')))]",
                             "ConfigurationFunction": "CreateADPDC.ps1\\CreateADPDC",
                             "Properties": {
                                 "DomainName": "[parameters('domainName')]",

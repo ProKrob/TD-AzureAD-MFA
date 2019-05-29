@@ -294,7 +294,7 @@
                     "properties": {
                         "publisher": "Microsoft.Powershell",
                         "type": "DSC",
-                        "typeHandlerVersion": "2.19",
+                        "typeHandlerVersion": "2.7",
                         "autoUpgradeMinorVersion": true,
                         "settings": {
                             "ModulesUrl": "[uri(parameters('powershellScriptLocation'), concat('/DSC/CreateADPDC.zip', parameters('_PSartifactsLocationSasToken')))]",

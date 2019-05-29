@@ -70,7 +70,7 @@
             "metadata": {
                 "description": "Auto-generated token to access _artifactsLocation"
             },
-            "defaultValue": ""
+            "defaultValue": "hlIOPqPj4BBAj5gg38PyZQeICki1usqkUhbjgPIp5AuH1pXcNjoDKHDIpv+60r+z20oUI7rG5tiA62mxWnAFug=="
         },
         "location": {
             "type": "string",

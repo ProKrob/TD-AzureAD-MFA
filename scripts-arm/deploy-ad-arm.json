@@ -298,6 +298,7 @@
                         "autoUpgradeMinorVersion": true,
                         "settings": {
                             "ModulesUrl": "[uri(parameters('powershellScriptLocation'), concat('/DSC/CreateADPDC.zip'))]",
+                            "SaSToken": "parameters('_PSartifactsLocationSasToken')",
                             "ConfigurationFunction": "CreateADPDC.ps1\\CreateADPDC",
                             "Properties": {
                                 "DomainName": "[parameters('domainName')]",

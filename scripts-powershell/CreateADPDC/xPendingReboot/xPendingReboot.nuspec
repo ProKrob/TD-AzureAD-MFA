@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>xPendingReboot</id>
+    <version>0.4.0.0</version>
+    <authors>Microsoft Corporation</authors>
+    <owners>Microsoft Corporation</owners>
+    <licenseUrl>https://github.com/PowerShell/xPendingReboot/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/PowerShell/xPendingReboot</projectUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>This module identifies pending reboots in Windows Server and acts on them.</description>
+    <releaseNotes>* Converted appveyor.yml to install Pester from PSGallery instead of from Chocolatey.
+* Fixes registry not being evaluated correctly.
+* Fixes failing tests introduced in changes to Pester 4.
+* Change layout of parameters to compile with style guide.</releaseNotes>
+    <copyright>(c) 2014 Microsoft Corporation. All rights reserved.</copyright>
+    <tags>DesiredStateConfiguration DSC DSCResourceKit DSCResource PSModule PSIncludes_DscResource PSDscResource_xPendingReboot</tags>
+  </metadata>
+</package>

@@ -1,6 +1,6 @@
 @{
 # Version number of this module.
-ModuleVersion = '2.16.0.0'
+moduleVersion = '2.24.0.0'
 
 # ID used to uniquely identify this module
 GUID = '9FECD4F6-8F02-4707-99B3-539E940E9FF5'
@@ -49,8 +49,8 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = '* xAdDomainController: Update to complete fix for SiteName being required field.
-* xADDomain: Added retry logic to prevent FaultException to crash in Get-TargetResource on subsequent reboots after a domain is created because the service is not yet running. This error is mostly occur when the resource is used with the DSCExtension on Azure. 
+        ReleaseNotes = '* Added parameter to xADDomainController to support InstallationMediaPath ([issue 108](https://github.com/PowerShell/xActiveDirectory/issues/108)).
+* Updated xADDomainController schema to be standard and provide Descriptions.
 
 '
 
@@ -58,6 +58,14 @@ PrivateData = @{
 
 } # End of PrivateData hashtable
 }
+
+
+
+
+
+
+
+
 
 
 

@@ -10,7 +10,7 @@
 # RootModule = ''
 
 # Version number of this module.
-ModuleVersion = '2.9.0.0'
+ModuleVersion = '3.4.0.0'
 
 # ID used to uniquely identify this module
 GUID = '00d73ca1-58b5-46b7-ac1a-5bfcf5814faf'
@@ -22,7 +22,7 @@ Author = 'PowerShell DSC'
 CompanyName = 'Microsoft Corporation'
 
 # Copyright statement for this module
-Copyright = '2015'
+Copyright = '2017'
 
 # Description of the functionality provided by this module
 Description = 'This module contains all resources related to the PowerShell Storage module, or pertaining to disk management.'
@@ -102,27 +102,15 @@ PrivateData = @{
         # IconUri = ''
 
         # ReleaseNotes of this module
-        ReleaseNotes = '- Updated readme.md to remove markdown best practice rule violations.
-- Updated readme.md to match DSCResources/DscResource.Template/README.md.
+        ReleaseNotes = '- xDisk:
+  - Removed duplicate integration tests for Guid Disk Id type.
+  - Added new contexts to integration tests improve clarity.
+  - Fix bug when size not specified and disk partitioned and
+    formatted but not assigned drive letter - See [Issue 103](https://github.com/PowerShell/xStorage/issues/103).
 - xDiskAccessPath:
-  - Fix bug when re-attaching disk after mount point removed or detatched.
-  - Additional log entries added for improved diagnostics.
-  - Additional integration tests added.
-  - Improve timeout loop.
-- Converted integration tests to use ```$TestDrive``` as working folder or ```temp``` folder when persistence across tests is required.
-- Suppress ```PSUseShouldProcessForStateChangingFunctions``` rule violations in resources.
-- Rename ```Test-AccessPath``` function to ```Assert-AccessPathValid```.
-- Rename ```Test-DriveLetter``` function to ```Assert-DriveLetterValid```.
-- Added ```CommonResourceHelper.psm1``` module (based on PSDscResources).
-- Added ```CommonTestsHelper.psm1``` module  (based on PSDscResources).
-- Converted all modules to load localization data using ```Get-LocalizedData``` from CommonResourceHelper.
-- Converted all exception calls and tests to use functions in ```CommonResourceHelper.psm1``` and ```CommonTestsHelper.psm1``` respectively.
-- Fixed examples:
-  - Sample_InitializeDataDisk.ps1
-  - Sample_InitializeDataDiskWithAccessPath.ps1
-  - Sample_xMountImage_DismountISO.ps1
-- xDisk:
-  - Improve timeout loop.
+  - Added new contexts to integration tests improve clarity.
+  - Fix bug when size not specified and disk partitioned and
+    formatted but not assigned to path - See [Issue 103](https://github.com/PowerShell/xStorage/issues/103).
 
 '
 
@@ -137,6 +125,11 @@ PrivateData = @{
 # DefaultCommandPrefix = ''
 
 }
+
+
+
+
+
 
 
 

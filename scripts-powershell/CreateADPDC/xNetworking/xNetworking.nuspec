@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>xNetworking</id>
+    <version>5.7.0.0</version>
+    <authors>Microsoft Corporation</authors>
+    <owners>Microsoft Corporation</owners>
+    <licenseUrl>https://github.com/PowerShell/xNetworking/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/PowerShell/xNetworking</projectUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>Module with DSC Resources for Networking area</description>
+    <releaseNotes>- Enabled PSSA rule violations to fail build - Fixes [Issue 320](https://github.com/PowerShell/xNetworking/issues/320).
+- MSFT_xNetAdapterAdvancedProperty:
+  - Enabled setting the same property on multiple network
+    adapters - Fixes [issue 324](https://github.com/PowerShell/xNetworking/issues/324).</releaseNotes>
+    <copyright>(c) 2017 Microsoft Corporation. All rights reserved.</copyright>
+    <tags>DesiredStateConfiguration DSC DSCResourceKit DSCResource PSModule PSIncludes_DscResource PSDscResource_xDefaultGatewayAddress PSDscResource_xDHCPClient PSDscResource_xDnsClientGlobalSetting PSDscResource_xDnsConnectionSuffix PSDscResource_xDNSServerAddress PSDscResource_xFirewall PSDscResource_xFirewallProfile PSDscResource_xHostsFile PSDscResource_xIPAddress PSDscResource_xIPAddressOption PSDscResource_xNetAdapterAdvancedProperty PSDscResource_xNetAdapterBinding PSDscResource_xNetAdapterLso PSDscResource_xNetAdapterName PSDscResource_xNetAdapterRDMA PSDscResource_xNetAdapterRsc PSDscResource_xNetAdapterRss PSDscResource_xNetBIOS PSDscResource_xNetConnectionProfile PSDscResource_xNetworkTeam PSDscResource_xNetworkTeamInterface PSDscResource_xProxySettings PSDscResource_xRoute PSDscResource_xWeakHostReceive PSDscResource_xWeakHostSend PSDscResource_xWINSSetting</tags>
+  </metadata>
+</package>

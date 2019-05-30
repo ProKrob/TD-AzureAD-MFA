@@ -1,18 +1,24 @@
-﻿# Suppressed as per PSSA Rule Severity guidelines for unit/integration tests:
+# Suppressed as per PSSA Rule Severity guidelines for unit/integration tests:
 # https://github.com/PowerShell/DscResources/blob/master/PSSARuleSeverities.md
 [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
 param ()
 
-Import-Module -Name (Join-Path -Path (Split-Path $PSScriptRoot -Parent) `
-                               -ChildPath 'CommonResourceHelper.psm1')
+$modulePath = Join-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -ChildPath 'Modules'
 
-# Localized messages for Write-Verbose statements in this resource
-$script:localizedData = Get-LocalizedData -ResourceName 'MSFT_xDiskAccessPath'
+# Import the Storage Common Modules
+Import-Module -Name (Join-Path -Path $modulePath `
+        -ChildPath (Join-Path -Path 'StorageDsc.Common' `
+            -ChildPath 'StorageDsc.Common.psm1'))
 
-# Import the common storage functions
-Import-Module -Name ( Join-Path `
-    -Path (Split-Path -Path $PSScriptRoot -Parent) `
-    -ChildPath '\StorageCommon\StorageCommon.psm1' )
+# Import the Storage Resource Helper Module
+Import-Module -Name (Join-Path -Path $modulePath `
+        -ChildPath (Join-Path -Path 'StorageDsc.ResourceHelper' `
+            -ChildPath 'StorageDsc.ResourceHelper.psm1'))
+
+# Import Localization Strings
+$localizedData = Get-LocalizedData `
+    -ResourceName 'MSFT_xDiskAccessPath' `
+    -ResourcePath (Split-Path -Parent $Script:MyInvocation.MyCommand.Path)
 
 <#
     .SYNOPSIS
@@ -21,8 +27,11 @@ Import-Module -Name ( Join-Path `
     .PARAMETER AccessPath
     Specifies the access path folder to the assign the disk volume to
 
-    .PARAMETER DiskNumber
-    Specifies the disk number for which disk to modify.
+    .PARAMETER DiskId
+    Specifies the disk identifier for the disk to modify.
+
+    .PARAMETER DiskIdType
+    Specifies the identifier type the DiskId contains. Defaults to Number.
 
     .PARAMETER Size
     Specifies the size of new volume (use all available space on disk if not provided).
@@ -42,71 +51,77 @@ function Get-TargetResource
     [OutputType([System.Collections.Hashtable])]
     param
     (
-        [parameter(Mandatory)]
-        [System.String] $AccessPath,
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $AccessPath,
 
-        [parameter(Mandatory)]
-        [uint32] $DiskNumber,
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DiskId,
 
-        [UInt64] $Size,
+        [Parameter()]
+        [ValidateSet('Number', 'UniqueId', 'Guid')]
+        [System.String]
+        $DiskIdType = 'Number',
 
-        [System.String] $FSLabel,
+        [Parameter()]
+        [System.UInt64]
+        $Size,
 
-        [UInt32] $AllocationUnitSize,
+        [Parameter()]
+        [System.String]
+        $FSLabel,
 
-        [ValidateSet("NTFS","ReFS")]
+        [Parameter()]
+        [System.UInt32]
+        $AllocationUnitSize,
+
+        [Parameter()]
+        [ValidateSet('NTFS', 'ReFS')]
         [System.String]
         $FSFormat = 'NTFS'
     )
 
     Write-Verbose -Message ( @(
             "$($MyInvocation.MyCommand): "
-            $($LocalizedData.GettingDiskMessage -f $DiskNumber,$AccessPath)
+            $($localizedData.GettingDiskMessage -f $DiskIdType, $DiskId, $AccessPath)
         ) -join '' )
 
     # Validate the AccessPath parameter adding a trailing slash
     $AccessPath = Assert-AccessPathValid -AccessPath $AccessPath -Slash
 
-    $disk = Get-Disk `
-        -Number $DiskNumber `
-        -ErrorAction SilentlyContinue
+    # Get the Disk using the identifiers supplied
+    $disk = Get-DiskByIdentifier `
+        -DiskId $DiskId `
+        -DiskIdType $DiskIdType
 
-    $partition = Get-Partition `
-        -DiskNumber $DiskNumber `
-        -ErrorAction SilentlyContinue |
-            Where-Object -Property AccessPaths -Contains -Value $AccessPath
+    # Get the partitions on the disk
+    $partition = $disk | Get-Partition -ErrorAction SilentlyContinue
 
-    $volume = $partition | Get-Volume
+    # Check if the disk has an existing partition assigned to the access path
+    $assignedPartition = $partition |
+        Where-Object -Property AccessPaths -Contains -Value $AccessPath
+
+    $volume = $assignedPartition | Get-Volume
 
     $fileSystem = $volume.FileSystem
     $FSLabel = $volume.FileSystemLabel
 
-    # Prepare the AccessPath used in the CIM/WMI query (replaces '\' with '\\')
-    $queryAccessPath = $AccessPath -replace '\\','\\'
+    # Prepare the AccessPath used in the CIM query (replaces '\' with '\\')
+    $queryAccessPath = $AccessPath -replace '\\', '\\'
 
     $blockSize = (Get-CimInstance `
-        -Query "SELECT BlockSize from Win32_Volume WHERE Name = '$queryAccessPath'" `
-        -ErrorAction SilentlyContinue).BlockSize
-
-    if ($blockSize)
-    {
-        $AllocationUnitSize = $blockSize
-    }
-    else
-    {
-        # If Get-CimInstance did not return a value, try again with Get-WmiObject
-        $blockSize = (Get-WmiObject `
             -Query "SELECT BlockSize from Win32_Volume WHERE Name = '$queryAccessPath'" `
             -ErrorAction SilentlyContinue).BlockSize
-    } # if
 
     $returnValue = @{
-        DiskNumber = $disk.Number
-        AccessPath = $AccessPath
-        Size = $partition.Size
-        FSLabel = $FSLabel
+        DiskId             = $DiskId
+        DiskIdType         = $DiskIdType
+        AccessPath         = $AccessPath
+        Size               = $assignedPartition.Size
+        FSLabel            = $FSLabel
         AllocationUnitSize = $blockSize
-        FSFormat = $fileSystem
+        FSFormat           = $fileSystem
     }
     $returnValue
 } # Get-TargetResource
@@ -118,8 +133,11 @@ function Get-TargetResource
     .PARAMETER AccessPath
     Specifies the access path folder to the assign the disk volume to
 
-    .PARAMETER DiskNumber
-    Specifies the disk number for which disk to modify.
+    .PARAMETER DiskId
+    Specifies the disk identifier for the disk to modify.
+
+    .PARAMETER DiskIdType
+    Specifies the identifier type the DiskId contains. Defaults to Number.
 
     .PARAMETER Size
     Specifies the size of new volume (use all available space on disk if not provided).
@@ -140,41 +158,56 @@ function Set-TargetResource
     [CmdletBinding(SupportsShouldProcess = $true)]
     param
     (
-        [parameter(Mandatory)]
-        [System.String] $AccessPath,
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $AccessPath,
 
-        [parameter(Mandatory)]
-        [uint32] $DiskNumber,
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DiskId,
 
-        [UInt64] $Size,
+        [Parameter()]
+        [ValidateSet('Number', 'UniqueId', 'Guid')]
+        [System.String]
+        $DiskIdType = 'Number',
 
-        [System.String] $FSLabel,
+        [Parameter()]
+        [System.UInt64]
+        $Size,
 
-        [UInt32] $AllocationUnitSize,
+        [Parameter()]
+        [System.String]
+        $FSLabel,
 
-        [ValidateSet("NTFS","ReFS")]
+        [Parameter()]
+        [System.UInt32]
+        $AllocationUnitSize,
+
+        [Parameter()]
+        [ValidateSet('NTFS', 'ReFS')]
         [System.String]
         $FSFormat = 'NTFS'
     )
 
     Write-Verbose -Message ( @(
             "$($MyInvocation.MyCommand): "
-            $($LocalizedData.SettingDiskMessage -f $DiskNumber,$AccessPath)
+            $($localizedData.SettingDiskMessage -f $DiskIdType, $DiskId, $AccessPath)
         ) -join '' )
 
     # Validate the AccessPath parameter adding a trailing slash
     $AccessPath = Assert-AccessPathValid -AccessPath $AccessPath -Slash
 
-    $disk = Get-Disk `
-        -Number $DiskNumber `
-        -ErrorAction Stop
+    # Get the Disk using the identifiers supplied
+    $disk = Get-DiskByIdentifier `
+        -DiskId $DiskId `
+        -DiskIdType $DiskIdType
 
     if ($disk.IsOffline)
     {
         # Disk is offline, so bring it online
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.SetDiskOnlineMessage -f $DiskNumber)
+                $($localizedData.SetDiskOnlineMessage -f $DiskIdType, $DiskId)
             ) -join '' )
 
         $disk | Set-Disk -IsOffline $false
@@ -185,7 +218,7 @@ function Set-TargetResource
         # Disk is read-only, so make it read/write
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.SetDiskReadwriteMessage -f $DiskNumber)
+                $($localizedData.SetDiskReadWriteMessage -f $DiskIdType, $DiskId)
             ) -join '' )
 
         $disk | Set-Disk -IsReadOnly $false
@@ -193,54 +226,57 @@ function Set-TargetResource
 
     Write-Verbose -Message ( @(
             "$($MyInvocation.MyCommand): "
-            $($LocalizedData.CheckingDiskPartitionStyleMessage -f $DiskNumber)
+            $($localizedData.CheckingDiskPartitionStyleMessage -f $DiskIdType, $DiskId)
         ) -join '' )
 
     switch ($disk.PartitionStyle)
     {
-        "RAW"
+        'RAW'
         {
             # The disk partition table is not yet initialized, so initialize it with GPT
             Write-Verbose -Message ( @(
                     "$($MyInvocation.MyCommand): "
-                    $($LocalizedData.InitializingDiskMessage -f $DiskNumber)
+                    $($localizedData.InitializingDiskMessage -f $DiskIdType, $DiskId)
                 ) -join '' )
 
             $disk | Initialize-Disk `
-                -PartitionStyle "GPT"
+                -PartitionStyle 'GPT'
             break
-        } # "RAW"
-        "GPT"
+        } # 'RAW'
+
+        'GPT'
         {
             # The disk partition is already initialized with GPT.
             Write-Verbose -Message ( @(
                     "$($MyInvocation.MyCommand): "
-                    $($LocalizedData.DiskAlreadyInitializedMessage -f $DiskNumber)
+                    $($localizedData.DiskAlreadyInitializedMessage -f $DiskIdType, $DiskId)
                 ) -join '' )
             break
-        } # "GPT"
+        } # 'GPT'
+
         default
         {
             # This disk is initialized but not as GPT - so raise an exception.
             New-InvalidOperationException `
-                -Message ($LocalizedData.DiskAlreadyInitializedError -f `
-                    $DiskNumber,$Disk.PartitionStyle)
+                -Message ($localizedData.DiskAlreadyInitializedError -f `
+                    $DiskIdType, $DiskId, $Disk.PartitionStyle)
         } # default
     } # switch
 
     # Get the partitions on the disk
-    $partition = Get-Partition `
-        -DiskNumber $DiskNumber `
-        -ErrorAction SilentlyContinue
+    $partition = $disk | Get-Partition -ErrorAction SilentlyContinue
 
     # Check if the disk has an existing partition assigned to the access path
     $assignedPartition = $partition |
-            Where-Object -Property AccessPaths -Contains -Value $AccessPath
+        Where-Object -Property AccessPaths -Contains -Value $AccessPath
 
     if ($null -eq $assignedPartition)
     {
         # There is no partiton with this access path
-        $createPartition = $true
+        Write-Verbose -Message ( @(
+                "$($MyInvocation.MyCommand): "
+                $($localizedData.AccessPathNotFoundOnPartitionMessage -f $DiskIdType, $DiskId, $AccessPath)
+            ) -join '' )
 
         # Are there any partitions defined on this disk?
         if ($partition)
@@ -252,71 +288,103 @@ function Set-TargetResource
                 $partition = $partition |
                     Where-Object -Filter { $_.Type -eq 'Basic' -and $_.Size -eq $Size } |
                     Select-Object -First 1
+
+                if ($partition)
+                {
+                    # A partition matching the required size was found
+                    Write-Verbose -Message ($localizedData.MatchingPartitionFoundMessage -f `
+                            $DiskIdType, $DiskId, $partition.PartitionNumber)
+                }
+                else
+                {
+                    # A partition matching the required size was not found
+                    Write-Verbose -Message ($localizedData.MatchingPartitionNotFoundMessage -f `
+                            $DiskIdType, $DiskId)
+                } # if
             }
             else
             {
-                # Find the first basic partition of any size
-                $partition = $partition |
-                    Where-Object -Filter { $_.Type -eq 'Basic' } |
-                    Select-Object -First 1
-            } # if
+                <#
+                    No size specified, so see if there is a partition that has a volume
+                    matching the file system type that is not assigned to an access path.
+                #>
+                Write-Verbose -Message ($localizedData.MatchingPartitionNoSizeMessage -f `
+                        $DiskIdType, $DiskId)
 
-            if ($partition)
-            {
-                # A partition matching the required size was found
-                Write-Verbose -Message ($LocalizedData.MatchingPartitionFoundMessage -f `
-                    $DiskNumber,$partition.PartitionNumber)
+                $searchPartitions = $partition | Where-Object -FilterScript {
+                    $_.Type -eq 'Basic' -and -not (Test-AccessPathAssignedToLocal -AccessPath $_.AccessPaths)
+                }
 
-                $createPartition = $false
-            }
-            else
-            {
-                # A partition matching the required size was not found
-                Write-Verbose -Message ($LocalizedData.MatchingPartitionNotFoundMessage -f `
-                    $DiskNumber)
+                $partition = $null
+
+                foreach ($searchPartition in $searchPartitions)
+                {
+                    # Look for the volume in the partition.
+                    Write-Verbose -Message ($localizedData.SearchForVolumeMessage -f `
+                            $DiskIdType, $DiskId, $searchPartition.PartitionNumber, $FSFormat)
+
+                    $searchVolumes = $searchPartition | Get-Volume
+
+                    $volumeMatch = $searchVolumes | Where-Object -FilterScript {
+                        $_.FileSystem -eq $FSFormat
+                    }
+
+                    if ($volumeMatch)
+                    {
+                        <#
+                            Found a partition with a volume that matches file system
+                            type and not assigned an access path.
+                        #>
+                        $partition = $searchPartition
+
+                        Write-Verbose -Message ($localizedData.VolumeFoundMessage -f `
+                                $DiskIdType, $DiskId, $searchPartition.PartitionNumber, $FSFormat)
+
+                        break
+                    } # if
+                } # foreach
             } # if
         } # if
 
         # Do we need to create a new partition?
-        if ($createPartition)
+        if (-not $partition)
         {
             # Attempt to create a new partition
-            $partitionParams = @{
-                DiskNumber = $DiskNumber
-            }
+            $partitionParams = @{}
 
             if ($Size)
             {
                 # Use only a specific size
                 Write-Verbose -Message ( @(
                         "$($MyInvocation.MyCommand): "
-                        $($LocalizedData.CreatingPartitionMessage `
-                            -f $DiskNumber,"$($Size/1KB) KB")
+                        $($localizedData.CreatingPartitionMessage `
+                                -f $DiskIdType, $DiskId, "$($Size/1KB) KB")
                     ) -join '' )
-                $partitionParams["Size"] = $Size
+                $partitionParams['Size'] = $Size
             }
             else
             {
                 # Use the entire disk
                 Write-Verbose -Message ( @(
                         "$($MyInvocation.MyCommand): "
-                        $($LocalizedData.CreatingPartitionMessage `
-                            -f $DiskNumber,'all free space')
+                        $($localizedData.CreatingPartitionMessage `
+                                -f $DiskIdType, $DiskId, 'all free space')
                     ) -join '' )
-                $partitionParams["UseMaximumSize"] = $true
+                $partitionParams['UseMaximumSize'] = $true
             } # if
 
             # Create the partition
-            $partition = New-Partition @partitionParams
+            $partition = $disk | New-Partition @partitionParams
 
-            # After creating the partition it can take a few seconds for it to become writeable
-            # Wait for up to 30 seconds for the parition to become writeable
-            $start = Get-Date
+            <#
+                After creating the partition it can take a few seconds for it to become writeable
+                Wait for up to 30 seconds for the partition to become writeable
+            #>
             $timeout = (Get-Date) + (New-Timespan -Second 30)
-            While ($partition.IsReadOnly -and (Get-Date) -lt $timeout)
+            while ($partition.IsReadOnly -and (Get-Date) -lt $timeout)
             {
-                Write-Verbose -Message ($LocalizedData.NewPartitionIsReadOnlyMessage -f `
-                    $partition.DiskNumber,$partition.PartitionNumber)
+                Write-Verbose -Message ($localizedData.NewPartitionIsReadOnlyMessage -f `
+                        $DiskIdType, $DiskId, $partition.PartitionNumber)
 
                 Start-Sleep -Seconds 1
 
@@ -329,8 +397,8 @@ function Set-TargetResource
         {
             # The partition is still readonly - throw an exception
             New-InvalidOperationException `
-                -Message ($LocalizedData.ParitionIsReadOnlyError -f `
-                    $partition.DiskNumber,$partition.PartitionNumber)
+                -Message ($localizedData.NewParitionIsReadOnlyError -f `
+                    $DiskIdType, $DiskId, $partition.PartitionNumber)
         } # if
 
         $assignAccessPath = $true
@@ -340,8 +408,8 @@ function Set-TargetResource
         # The disk already has a partition on it that is assigned to the access path
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.PartitionAlreadyAssignedMessage -f `
-                    $AccessPath,$partition.PartitionNumber)
+                $($localizedData.PartitionAlreadyAssignedMessage -f `
+                        $AccessPath, $partition.PartitionNumber)
             ) -join '' )
 
         $assignAccessPath = $false
@@ -356,7 +424,7 @@ function Set-TargetResource
         # The volume is not formatted
         $volParams = @{
             FileSystem = $FSFormat
-            Confirm = $false
+            Confirm    = $false
         }
 
         if ($FSLabel)
@@ -373,7 +441,7 @@ function Set-TargetResource
 
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.FormattingVolumeMessage -f $volParams.FileSystem)
+                $($localizedData.FormattingVolumeMessage -f $volParams.FileSystem)
             ) -join '' )
 
         # Format the volume
@@ -392,8 +460,8 @@ function Set-TargetResource
                 # There is nothing we can do to resolve this (yet)
                 Write-Verbose -Message ( @(
                         "$($MyInvocation.MyCommand): "
-                        $($LocalizedData.FileSystemFormatMismatch -f `
-                            $AccessPath,$fileSystem,$FSFormat)
+                        $($localizedData.FileSystemFormatMismatch -f `
+                                $AccessPath, $fileSystem, $FSFormat)
                     ) -join '' )
             } # if
         } # if
@@ -407,8 +475,8 @@ function Set-TargetResource
                 # The volume lable needs to be changed because it is different.
                 Write-Verbose -Message ( @(
                         "$($MyInvocation.MyCommand): "
-                        $($LocalizedData.ChangingVolumeLabelMessage `
-                            -f $volume.DriveLetter,$FSLabel)
+                        $($localizedData.ChangingVolumeLabelMessage `
+                                -f $AccessPath, $FSLabel)
                     ) -join '' )
 
                 $volume | Set-Volume -NewFileSystemLabel $FSLabel
@@ -419,14 +487,19 @@ function Set-TargetResource
     # Assign the access path if it isn't assigned
     if ($assignAccessPath)
     {
+        <#
+            Add the partition access path, but do not pipe $disk to
+            Add-PartitionAccessPath because it is not supported in
+            Windows Server 2012 R2
+        #>
         $null = Add-PartitionAccessPath `
             -AccessPath $AccessPath `
-            -DiskNumber $DiskNumber `
+            -DiskNumber $disk.Number `
             -PartitionNumber $partition.PartitionNumber
 
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.SuccessfullyInitializedMessage -f $AccessPath)
+                $($localizedData.SuccessfullyInitializedMessage -f $AccessPath)
             ) -join '' )
     } # if
 } # Set-TargetResource
@@ -438,8 +511,11 @@ function Set-TargetResource
     .PARAMETER AccessPath
     Specifies the access path folder to the assign the disk volume to
 
-    .PARAMETER DiskNumber
-    Specifies the disk number for which disk to modify.
+    .PARAMETER DiskId
+    Specifies the disk identifier for the disk to modify.
+
+    .PARAMETER DiskIdType
+    Specifies the identifier type the DiskId contains. Defaults to Number.
 
     .PARAMETER Size
     Specifies the size of new volume (use all available space on disk if not provided).
@@ -459,26 +535,40 @@ function Test-TargetResource
     [OutputType([System.Boolean])]
     param
     (
-        [parameter(Mandatory)]
-        [System.String] $AccessPath,
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $AccessPath,
 
-        [parameter(Mandatory)]
-        [uint32] $DiskNumber,
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DiskId,
 
-        [UInt64] $Size,
+        [Parameter()]
+        [ValidateSet('Number', 'UniqueId', 'Guid')]
+        [System.String]
+        $DiskIdType = 'Number',
 
-        [System.String] $FSLabel,
+        [Parameter()]
+        [System.UInt64]
+        $Size,
 
-        [UInt32] $AllocationUnitSize,
+        [Parameter()]
+        [System.String]
+        $FSLabel,
 
-        [ValidateSet("NTFS","ReFS")]
+        [Parameter()]
+        [System.UInt32]
+        $AllocationUnitSize,
+
+        [Parameter()]
+        [ValidateSet('NTFS', 'ReFS')]
         [System.String]
         $FSFormat = 'NTFS'
     )
 
     Write-Verbose -Message ( @(
             "$($MyInvocation.MyCommand): "
-            $($LocalizedData.TestingDiskMessage -f $DiskNumber,$AccessPath)
+            $($localizedData.TestingDiskMessage -f $DiskIdType, $DiskId, $AccessPath)
         ) -join '' )
 
     # Validate the AccessPath parameter adding a trailing slash
@@ -486,18 +576,19 @@ function Test-TargetResource
 
     Write-Verbose -Message ( @(
             "$($MyInvocation.MyCommand): "
-            $($LocalizedData.CheckDiskInitializedMessage -f $DiskNumber)
+            $($localizedData.CheckDiskInitializedMessage -f $DiskIdType, $DiskId)
         ) -join '' )
 
-    $disk = Get-Disk `
-        -Number $DiskNumber `
-        -ErrorAction SilentlyContinue
+    # Get the Disk using the identifiers supplied
+    $disk = Get-DiskByIdentifier `
+        -DiskId $DiskId `
+        -DiskIdType $DiskIdType
 
     if (-not $disk)
     {
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.DiskNotFoundMessage -f $DiskNumber)
+                $($localizedData.DiskNotFoundMessage -f $DiskIdType, $DiskId)
             ) -join '' )
         return $false
     } # if
@@ -506,7 +597,7 @@ function Test-TargetResource
     {
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.DiskNotOnlineMessage -f $DiskNumber)
+                $($localizedData.DiskNotOnlineMessage -f $DiskIdType, $DiskId)
             ) -join '' )
         return $false
     } # if
@@ -515,61 +606,56 @@ function Test-TargetResource
     {
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.DiskReadOnlyMessage -f $DiskNumber)
+                $($localizedData.DiskReadOnlyMessage -f $DiskIdType, $DiskId)
             ) -join '' )
         return $false
     } # if
 
-    if ($disk.PartitionStyle -ne "GPT")
+    if ($disk.PartitionStyle -ne 'GPT')
     {
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.DiskNotGPTMessage -f $DiskNumber,$Disk.PartitionStyle)
+                $($localizedData.DiskNotGPTMessage -f $DiskIdType, $DiskId, $Disk.PartitionStyle)
             ) -join '' )
         return $false
     } # if
 
-    $partition = Get-Partition `
-        -DiskNumber $DiskNumber `
-        -ErrorAction SilentlyContinue |
-            Where-Object -Property AccessPaths -Contains -Value $AccessPath
+    # Get the partitions on the disk
+    $partition = $disk | Get-Partition -ErrorAction SilentlyContinue
 
-    if (-not $partition)
+    # Check if the disk has an existing partition assigned to the access path
+    $assignedPartition = $partition |
+        Where-Object -Property AccessPaths -Contains -Value $AccessPath
+
+    if (-not $assignedPartition)
     {
         Write-Verbose -Message ( @(
                 "$($MyInvocation.MyCommand): "
-                $($LocalizedData.AccessPathNotFoundMessage -f $AccessPath)
+                $($localizedData.AccessPathNotFoundMessage -f $AccessPath)
             ) -join '' )
         return $false
     } # if
 
-    # Drive size
+    # Partition size was passed so check it
     if ($Size)
     {
-        if ($partition.Size -ne $Size)
+        if ($assignedPartition.Size -ne $Size)
         {
             # The partition size mismatches but can't be changed (yet)
             Write-Verbose -Message ( @(
                     "$($MyInvocation.MyCommand): "
-                    $($LocalizedData.SizeMismatchMessage -f `
-                        $AccessPath,$Partition.Size,$Size)
+                    $($localizedData.SizeMismatchMessage -f `
+                            $AccessPath, $assignedPartition.Size, $Size)
                 ) -join '' )
         } # if
     } # if
 
-    # Prepare the AccessPath used in the CIM/WMI query (replaces '\' with '\\')
-    $queryAccessPath = $AccessPath -replace '\\','\\'
+    # Prepare the AccessPath used in the CIM query (replaces '\' with '\\')
+    $queryAccessPath = $AccessPath -replace '\\', '\\'
 
     $blockSize = (Get-CimInstance `
-        -Query "SELECT BlockSize from Win32_Volume WHERE Name = '$queryAccessPath'" `
-        -ErrorAction SilentlyContinue).BlockSize
-    if (-not ($blockSize))
-    {
-        # If Get-CimInstance did not return a value, try again with Get-WmiObject
-        $blockSize = (Get-WmiObject `
             -Query "SELECT BlockSize from Win32_Volume WHERE Name = '$queryAccessPath'" `
             -ErrorAction SilentlyContinue).BlockSize
-    } # if
 
     if ($blockSize -gt 0 -and $AllocationUnitSize -ne 0)
     {
@@ -578,14 +664,14 @@ function Test-TargetResource
             # The allocation unit size mismatches but can't be changed (yet)
             Write-Verbose -Message ( @(
                     "$($MyInvocation.MyCommand): "
-                    $($LocalizedData.AllocationUnitSizeMismatchMessage -f `
-                        $AccessPath,$($blockSize.BlockSize/1KB),$($AllocationUnitSize/1KB))
+                    $($localizedData.AllocationUnitSizeMismatchMessage -f `
+                            $AccessPath, $($blockSize.BlockSize / 1KB), $($AllocationUnitSize / 1KB))
                 ) -join '' )
         } # if
     } # if
 
     # Get the volume so the properties can be checked
-    $volume = $partition | Get-Volume
+    $volume = $assignedPartition | Get-Volume
 
     if ($PSBoundParameters.ContainsKey('FSFormat'))
     {
@@ -596,8 +682,8 @@ function Test-TargetResource
             # The file system format does not match but can't be changed (yet)
             Write-Verbose -Message ( @(
                     "$($MyInvocation.MyCommand): "
-                    $($LocalizedData.FileSystemFormatMismatch -f `
-                        $AccessPath,$fileSystem,$FSFormat)
+                    $($localizedData.FileSystemFormatMismatch -f `
+                            $AccessPath, $fileSystem, $FSFormat)
                 ) -join '' )
         } # if
     } # if
@@ -611,8 +697,8 @@ function Test-TargetResource
             # The assigned volume label is different and needs updating
             Write-Verbose -Message ( @(
                     "$($MyInvocation.MyCommand): "
-                    $($LocalizedData.DriveLabelMismatch -f `
-                        $DriveLetter,$label,$FSLabel)
+                    $($localizedData.DriveLabelMismatch -f `
+                            $AccessPAth, $label, $FSLabel)
                 ) -join '' )
             return $false
         } # if
